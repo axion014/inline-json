@@ -1,3 +1,30 @@
+//! This crate provides the `json!` macro. It lets you write JSON literal inside your Rust code.
+//! Inside the macro, you can also write arbitrary Rust expressions in place of JSON value,
+//! as long as they don't include JSON delimiter(`'` or `:`).
+//! You need `cc-traits` in your dependency to use this macro.
+//!
+//! ## Example
+//! ```
+//! # use inline_json::json;
+//! use json_trait::{ForeignMutableJson, BuildableJson};
+//! # fn test<T: ForeignMutableJson + BuildableJson>() {
+//! let json: T = json!(T, {"name": "example", "array": ["foo", "bar"]});
+//! // Expands to:
+//! assert_eq!(json, {
+//!     let mut object = <T>::empty_object();
+//!     <_ as cc_traits::MapInsert<_>>::insert(&mut object, "name".to_string(), <_ as Into<T>>::into("example"));
+//!     <_ as cc_traits::MapInsert<_>>::insert(&mut object, "array".to_string(), {
+//!         let mut array = <T>::empty_array();
+//!         <_ as cc_traits::PushBack>::push_back(&mut array, <_ as Into<T>>::into("foo"));
+//!         <_ as cc_traits::PushBack>::push_back(&mut array, <_ as Into<T>>::into("bar"));
+//!         array.into()
+//!     });
+//!     object.into()
+//! });
+//! # }
+//! # test::<serde_json::Value>();
+//! ```
+
 extern crate proc_macro;
 
 use proc_macro::{Delimiter, TokenStream, TokenTree};
@@ -23,7 +50,7 @@ fn json_impl<'a>(ty: &Type, iter: Box<dyn Iterator<Item = TokenTree> + 'a>) -> T
 					let key = iter.by_ref().take_while(is_not_punct(':')).collect();
 					let key = parse_macro_input!(key as Expr);
 					let value: proc_macro2::TokenStream = json_impl(ty, Box::new(iter.by_ref().take_while(is_not_punct(',')))).into();
-					entries.push(quote! { object.insert((#key).to_string(), #value); });
+					entries.push(quote! { <_ as cc_traits::MapInsert<_>>::insert(&mut object, (#key).to_string(), #value); });
 				}
 				return (quote! {{
 					let mut object = <#ty>::empty_object();
@@ -40,7 +67,7 @@ fn json_impl<'a>(ty: &Type, iter: Box<dyn Iterator<Item = TokenTree> + 'a>) -> T
 				}
 				return (quote! {{
 					let mut array = <#ty>::empty_array();
-					#(array.push_back(#values);)*
+					#(<_ as cc_traits::PushBack>::push_back(&mut array, #values);)*
 					array.into()
 				}})
 				.into();

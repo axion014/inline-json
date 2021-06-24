@@ -15,3 +15,8 @@ proc-macro = true
 syn = "1.0"
 quote = "1.0"
 proc-macro2 = "1.0"
+
+[dev-dependencies]
+json-trait = { git = "https://github.com/axion014/json-trait", features = ["impl_serde_json"] }
+cc-traits = { git = "https://github.com/axion014/cc-traits", branch = "serde-json-map"}
+serde_json = "1.0"
