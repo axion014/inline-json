@@ -27,8 +27,8 @@
 
 extern crate proc_macro;
 
-use proc_macro::{Delimiter, TokenStream, TokenTree};
-use quote::quote;
+use proc_macro::{Delimiter, Span, TokenStream, TokenTree};
+use quote::{quote, quote_spanned};
 use syn::{parse_macro_input, Expr, Type};
 
 #[proc_macro]
@@ -50,11 +50,11 @@ fn json_impl<'a>(ty: &Type, iter: Box<dyn Iterator<Item = TokenTree> + 'a>) -> T
 					let key = iter.by_ref().take_while(is_not_punct(':')).collect();
 					let key = parse_macro_input!(key as Expr);
 					let value: proc_macro2::TokenStream = json_impl(ty, Box::new(iter.by_ref().take_while(is_not_punct(',')))).into();
-					entries.push(quote! { <_ as cc_traits::MapInsert<_>>::insert(&mut object, (#key).to_string(), #value); });
+					entries.push(quote! { (#key).to_string(), #value });
 				}
-				return (quote! {{
+				return (quote_spanned! {Span::mixed_site().into()=>{
 					let mut object = <#ty>::empty_object();
-					#(#entries)*
+					#(<_ as cc_traits::MapInsert<_>>::insert(&mut object, #entries);)*
 					object.into()
 				}})
 				.into();
@@ -65,7 +65,7 @@ fn json_impl<'a>(ty: &Type, iter: Box<dyn Iterator<Item = TokenTree> + 'a>) -> T
 				while iter.peek().is_some() {
 					values.push(json_impl(ty, Box::new(iter.by_ref().take_while(is_not_punct(',')))).into());
 				}
-				return (quote! {{
+				return (quote_spanned! {Span::mixed_site().into()=>{
 					let mut array = <#ty>::empty_array();
 					#(<_ as cc_traits::PushBack>::push_back(&mut array, #values);)*
 					array.into()
